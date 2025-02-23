@@ -1,0 +1,265 @@
+import { useState, useEffect } from "react";
+
+const useFetch = (url) => {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    let isMounted = true;
+    setLoading(true);
+
+    fetch(url)
+      .then((res) => res.json())
+      .then((data) => {
+        if (isMounted) {
+          setData(data);
+          setLoading(false);
+        }
+      })
+      .catch((err) => {
+        if (isMounted) {
+          setError(err);
+          setLoading(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [url]);
+
+  return { data, loading, error };
+};
+
+export default useFetch;
+
+// Usage
+const App = () => {
+  const { data, loading, error } = useFetch("https://jsonplaceholder.typicode.com/posts");
+
+  if (loading) return <p>Loading...</p>;
+  if (error) return <p>Error loading data.</p>;
+
+  return (
+    <ul>
+      {data.map((post) => (
+        <li key={post.id}>{post.title}</li>
+      ))}
+    </ul>
+  );
+};
+
+
+
+
+
+
+------------------------------------------------------------------------------------------------
+
+This hook simplifies API calls by handling loading states, errors, and caching responses.
+This hook lets you store values in localStorage and automatically update the state.
+const useLocalStorage = (key, initialValue) => {
+  // 🔹 1. Read from localStorage ONCE (Lazy Initialization)
+  const [storedValue, setStoredValue] = useState(() => {
+    try {
+      const item = localStorage.getItem(key);
+      return item ? JSON.parse(item) : initialValue; // ✅ If value exists, return parsed value
+    } catch (error) {
+      console.error(error);
+      return initialValue; // 🚨 Error handling: return fallback value
+    }
+  });
+
+  // 🔹 2. Whenever storedValue changes, update localStorage
+  useEffect(() => {
+    localStorage.setItem(key, JSON.stringify(storedValue)); // ✅ Store updated value
+  }, [key, storedValue]);
+
+  return [storedValue, setStoredValue]; // 🔹 3. Return value and setter function
+};
+
+
+const App = () => {
+  const [theme, setTheme] = useLocalStorage("theme", "light");
+
+  return (
+    <div style={{ background: theme === "light" ? "#fff" : "#333", color: theme === "light" ? "#000" : "#fff" }}>
+      <p>Current Theme: {theme}</p>
+      <button onClick={() => setTheme(theme === "light" ? "dark" : "light")}>
+        Toggle Theme
+      </button>
+    </div>
+  );
+};
+----------------------------------------------------------
+export const useLocalStorage = (key: string) => {
+  const setItem = (value: unknown) => {
+    try {
+      window.localStorage.setItem(key, JSON.stringify(value));
+    } catch (error) {
+      console.log(error);
+    }
+  };
+
+  const getItem = () => {
+    try {
+      const item = window.localStorage.getItem(key);
+      return item ? JSON.parse(item) : undefined;
+    } catch (error) {
+      console.log(error);
+    }
+  };
+
+  const removeItem = () => {
+    try {
+      window.localStorage.removeItem(key);
+    } catch (error) {
+      console.log(error);
+    }
+  };
+
+  return { setItem, getItem, removeItem };
+};
+
+import { useState } from 'react';
+
+import { useLocalStorage } from './useLocalStorage';
+
+const Demo = () => {
+  const [value, setValue] = useState('');
+
+  const { getItem, setItem, removeItem } = useLocalStorage('value');
+
+  return (
+    <div className='tutorial-shorts'>
+      <h1 className='mb-2 text-3xl font-bold'>useLocalStorage</h1>
+      <input
+        className='mb-4'
+        type='text'
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+      />
+      <div className='flex flex-row gap-4'>
+        <button onClick={() => setItem(value)}>Set</button>
+        <button onClick={() => console.log(getItem())}>Get</button>
+        <button onClick={removeItem}>Remove</button>
+      </div>
+    </div>
+  );
+};
+
+export default Demo;
+------------------------------------------------------
+Manages user authentication by storing tokens and checking login status.
+
+
+
+import { useState, useEffect } from "react";
+
+const useAuth = () => {
+  const [token, setToken] = useState(localStorage.getItem("token"));
+
+  const login = (newToken) => {
+    localStorage.setItem("token", newToken);
+    setToken(newToken);
+  };
+
+  const logout = () => {
+    localStorage.removeItem("token");
+    setToken(null);
+  };
+
+  return { token, login, logout, isAuthenticated: !!token };
+};
+
+export default useAuth;
+
+// Usage
+const Login = () => {
+  const { login, logout, isAuthenticated } = useAuth();
+
+  return (
+    <div>
+      {isAuthenticated ? (
+        <button onClick={logout}>Logout</button>
+      ) : (
+        <button onClick={() => login("my-secret-token")}>Login</button>
+      )}
+    </div>
+  );
+};
+-----------------------------------------------------------
+Tracks the previous state before an update.
+import { useRef, useEffect } from "react";
+
+const usePrevious = (value) => {
+  const ref = useRef();
+  useEffect(() => {
+    ref.current = value;
+  });
+  return ref.current;
+};
+
+export default usePrevious;
+
+// Usage
+const Counter = () => {
+  const [count, setCount] = useState(0);
+  const prevCount = usePrevious(count);
+
+  return (
+    <div>
+      <p>Current: {count}</p>
+      <p>Previous: {prevCount}</p>
+      <button onClick={() => setCount(count + 1)}>Increment</button>
+    </div>
+  );
+};
+--------------------------------------------
+The useDebounce hook delays updating the value until the user stops typing for a specified duration (default: 500ms).
+
+It is commonly used in:
+✅ Search bars (reduces API calls on every keystroke)
+✅ Auto-suggestions (triggers only after typing is paused)
+✅ Resize events (prevents unnecessary re-renders)
+ User types in the input field → query updates immediately.
+2️⃣ useDebounce starts a setTimeout with a delay of 500ms.
+3️⃣ If the user types again before 500ms, the previous timeout is cleared.
+4️⃣ Once the user stops typing for 500ms, debouncedValue updates.
+5️⃣ The useEffect in SearchBar triggers an API call using debouncedQuery.
+
+const useDebounce = (value, delay = 500) => {
+  const [debouncedValue, setDebouncedValue] = useState(value);
+
+  useEffect(() => {
+    // ⏳ Start a timer
+    const handler = setTimeout(() => {
+      setDebouncedValue(value);
+    }, delay);
+
+    // 🚀 Cleanup function: Runs before the next effect
+    return () => clearTimeout(handler);
+  }, [value, delay]); // 🛑 Runs every time `value` or `delay` changes
+
+  return debouncedValue;
+};
+
+const SearchBar = () => {
+  const [query, setQuery] = useState(""); // 💡 User input state
+  const debouncedQuery = useDebounce(query); // 🔄 Debounced value
+
+  useEffect(() => {
+    if (debouncedQuery) {
+      console.log("Fetching results for:", debouncedQuery); // ⏳ Triggers only when typing stops
+    }
+  }, [debouncedQuery]);
+
+  return (
+    <input
+      value={query}
+      onChange={(e) => setQuery(e.target.value)} // 🚀 Updates `query` instantly
+      placeholder="Search..."
+    />
+  );
+};
